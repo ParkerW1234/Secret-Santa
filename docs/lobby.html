@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Lobby</title>
+    <link rel="stylesheet" href="./style.css">
+</head> 
+<body>
+<div class="container">
+  <div class="header">
+    <div class="brand">
+      <div class="logo"></div>
+      <div>
+        <h1>Lobby</h1>
+        <div class="small">Share the code • Wait for the host to start</div>
+      </div>
+    </div>
+
+    <a class="pill" href="dashboard.html">← Dashboard</a>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <span class="pill">
+        <span class="small">Game Code</span>
+        <span id="gameCodeText" class="code">.....</span>
+      </span>
+
+      <button id="copyCodeBtn" class="ghost">Copy</button>
+      <div class="spacer"></div>
+
+      <button id="startGameBtn" class="primary">Start Game</button>
+    </div>
+
+    <p id="hostOnlyNote" class="small" style="margin-top:10px;"></p>
+
+    <div class="row" style="margin-top:10px;">
+      <button id="revealBtn">View My Assignment</button>
+      <span id="revealStatus" class="small"></span>
+    </div>
+
+    <h2 style="margin-top:16px;">Players</h2>
+    <ul id="playerList"></ul>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<script type="module" src="app.js"></script>
+
+</body>
+</html>
