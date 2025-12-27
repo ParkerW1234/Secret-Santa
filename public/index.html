@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Secret Santa</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          <h1>Secret Santa</h1>
+          <div class="small">A simple Secret Santa organizer</div>
+        </div>
+      </div>
+
+      <a class="pill" href="./login.html">Log in →</a>
+    </div>
+
+    <div class="grid two">
+      <div class="card">
+        <h2>What this is</h2>
+        <p class="small">
+          This site runs a Secret Santa game for a group. One person creates a game and shares a short code.
+          Everyone joins, the host starts the game, and each person sees exactly one assignment:
+          who they’re buying for.
+        </p>
+
+        <div class="row" style="margin-top:12px;">
+          <a href="./login.html"><button class="primary">Get started</button></a>
+          <a href="./dashboard.html"><button class="ghost">Go to dashboard</button></a>
+        </div>
+
+        <p class="small" style="margin-top:12px;">
+          No passwords. You log in with an email link.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>How it works</h2>
+        <ul>
+          <li><span>1) Log in</span><span class="badge">email link</span></li>
+          <li><span>2) Pick a username</span><span class="badge">display name</span></li>
+          <li><span>3) Create or join</span><span class="badge">5-char code</span></li>
+          <li><span>4) Host starts</span><span class="badge">locks joining</span></li>
+          <li><span>5) Reveal</span><span class="badge">private assignment</span></li>
+        </ul>
+        <p class="small" style="margin-top:10px;">
+          Minimum 3 players to start. Once started, assignments are generated and each person can view theirs.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>Privacy</h2>
+        <p class="small">
+          Your email is only used for login. Your username is what people see in the lobby.
+          Assignments are private: each player can only view their own.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>Perfect for</h2>
+        <p class="small">
+          Friends, family, teams, classrooms, and holiday parties. Quick setup, no accounts to manage.
+        </p>
+
+        <div class="row" style="margin-top:12px;">
+          <span class="pill">🎁 fun</span>
+          <span class="pill">🔒 simple</span>
+          <span class="pill">⚡ fast</span>
+        </div>
+      </div>
+    </div>
+
+    <p class="small" style="margin-top:18px; opacity:.9;">
+      Built with Firebase (Auth + Firestore) and a lightweight front-end.
+      Made with ♥ by Parker Wasileski.
+    </p>
+  </div>
+</body>
+</html>

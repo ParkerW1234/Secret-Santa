@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="./style.css">
+</head> 
+<body>
+   <div class="container">
+  <div class="header">
+    <div class="brand">
+      <div class="logo"></div>
+      <div>
+        <h1>Dashboard</h1>
+        <div class="small">Create or join a game</div>
+      </div>
+    </div>
+
+    <button id="logoutBtn" class="danger">Logout</button>
+  </div>
+
+  <div class="grid two">
+    <div class="card">
+      <h2>Your profile</h2>
+
+      <label for="usernameInput">Username</label>
+      <div class="row">
+        <input id="usernameInput" placeholder="e.g. Parker" />
+        <button id="saveUsernameBtn" class="primary">Save</button>
+      </div>
+
+      <p id="currentUsername" class="small"></p>
+    </div>
+
+    <div class="card">
+      <h2>Create game</h2>
+      <p class="small">You’ll get a code to share with friends.</p>
+      <button id="createGameBtn" class="primary">Create Game</button>
+    </div>
+
+    <div class="card">
+      <h2>Join game</h2>
+
+      <label for="gameCode">Game code</label>
+      <div class="row">
+        <input id="gameCode" placeholder="ABCDE" />
+        <button id="joinGameBtn" class="primary">Join</button>
+      </div>
+
+      <p class="small">Codes are 5 characters.</p>
+    </div>
+
+    <div class="card">
+      <h2>Quick tips</h2>
+      <div class="small">
+        • Set a budget + deadline in your group chat.<br/>
+        • Minimum 3 players to start.<br/>
+        • Once started, joining is locked.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<script type="module" src="app.js"></script>
+
+</body>
+</html>
