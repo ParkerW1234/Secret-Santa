@@ -479,7 +479,7 @@ if (loginBtn) {
       if (!email) return toast("Enter your email.");
 
       const actionCodeSettings = {
-        url: `${window.location.origin}/public/login.html`,
+        url: `${window.location.origin}secret-santa/public/login.html`,
         handleCodeInApp: true,
       };
 
