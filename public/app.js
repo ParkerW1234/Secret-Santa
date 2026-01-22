@@ -1,5 +1,3 @@
-// public/app.js
-
 // ===============================
 // Firebase (Firestore only)
 // ===============================
@@ -37,13 +35,49 @@ const db = getFirestore();
 // ===============================
 // Auth helpers (Netlify + whoami)
 // ===============================
+
+/**
+ * Normalizes whatever /whoami returns into:
+ *   { email, sub, name } or null
+ *
+ * Supports both:
+ *   { user: { ... } }
+ * and:
+ *   { iss, sub, email, ... }
+ */
+function normalizeUserPayload(data) {
+  if (!data) return null;
+
+  // Shape 1: { user: { ... } }
+  if (data.user) {
+    const u = data.user;
+    return {
+      email: u.email || null,
+      sub: u.sub || u.id || null,
+      name: u.name || u.email || u.sub || null
+    };
+  }
+
+  // Shape 2: naked token { iss, sub, email, ... }
+  if (data.sub || data.email || data.iss) {
+    return {
+      email: data.email || null,
+      sub: data.sub || null,
+      name: data.name || data.email || data.sub || null
+    };
+  }
+
+  return null;
+}
+
 async function fetchUser() {
   try {
     const res = await fetch("/.netlify/functions/whoami", {
       credentials: "include"
     });
     const data = await res.json();
-    return data.user; // { email, sub, name } or null
+    const user = normalizeUserPayload(data);
+    return user; // or null
   } catch (err) {
     console.error("fetchUser failed:", err);
     return null;
@@ -103,20 +137,24 @@ function getGameIdFromUrl() {
   const path = window.location.pathname;
   const user = await fetchUser();
 
-  const protectedPath =
+  const isProtected =
     path.includes("dashboard") ||
     path.includes("lobby") ||
     path.includes("reveal");
 
-  if (!user && protectedPath) {
+  if (!user && isProtected) {
+    console.log("[guard] not logged in, redirecting to login");
     window.location.href = "login.html";
     return;
   }
 
   if (user && path.includes("login")) {
+    console.log("[guard] already logged in, redirecting to dashboard");
     window.location.href = "dashboard.html";
     return;
   }
+
+  console.log("[guard] path:", path, "user:", user);
 })();
 
 // ===============================
@@ -137,7 +175,7 @@ if (logoutBtn) {
 }
 
 // ===============================
-// Username profile
+// Username profile (Dashboard)
 // ===============================
 const usernameInput = document.getElementById("usernameInput");
 const saveUsernameBtn = document.getElementById("saveUsernameBtn");
@@ -148,12 +186,14 @@ if (usernameInput && saveUsernameBtn && currentUsernameEl) {
     const user = await requireUser();
     if (!user) return;
 
+    // We key users by email (your choice A)
     const userRef = doc(db, "users", user.email);
     const snap = await getDoc(userRef);
 
     if (snap.exists() && snap.data().username) {
-      currentUsernameEl.textContent = `Current username: ${snap.data().username}`;
-      usernameInput.value = snap.data().username;
+      const un = snap.data().username;
+      currentUsernameEl.textContent = `Current username: ${un}`;
+      usernameInput.value = un;
     } else {
       currentUsernameEl.textContent = "No username set yet.";
     }
@@ -170,7 +210,7 @@ if (usernameInput && saveUsernameBtn && currentUsernameEl) {
 }
 
 // ===============================
-// Game creation
+// Game creation (Dashboard)
 // ===============================
 function makeGameCode(len = 5) {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ23456789";
@@ -189,10 +229,9 @@ if (createGameBtn) {
       if (!user) return;
 
       const code = makeGameCode(5);
-
       const gameRef = await addDoc(collection(db, "games"), {
         code,
-        hostId: user.email,
+        hostId: user.email,    // host id by email
         status: "waiting",
         createdAt: serverTimestamp()
       });
@@ -206,7 +245,7 @@ if (createGameBtn) {
 }
 
 // ===============================
-// Join game
+// Join game (Dashboard)
 // ===============================
 const joinGameBtn = document.getElementById("joinGameBtn");
 if (joinGameBtn) {
@@ -221,7 +260,6 @@ if (joinGameBtn) {
 
       const q = query(collection(db, "games"), where("code", "==", code));
       const snap = await getDocs(q);
-
       if (snap.empty) return toast("Game not found. Check the code.");
 
       const gameDoc = snap.docs[0];
@@ -240,7 +278,7 @@ if (joinGameBtn) {
 }
 
 // ===============================
-// Lobby (players list + host controls)
+// Lobby (players list + join / host logic)
 // ===============================
 const gameCodeText = document.getElementById("gameCodeText");
 const playerListEl = document.getElementById("playerList");
@@ -263,14 +301,15 @@ if (gameCodeText && playerListEl) {
       const game = gameSnap.data();
       gameCodeText.textContent = game.code;
 
-      // Add current user to players collection
-      const profileSnap = await getDoc(doc(db, "users", user.email));
-      const username = profileSnap.exists()
-        ? profileSnap.data().username || ""
+      // Add current user to this game's players subcollection
+      const userProfileSnap = await getDoc(doc(db, "users", user.email));
+      const username = userProfileSnap.exists()
+        ? userProfileSnap.data().username || ""
         : "";
 
+      const playerRef = doc(db, "games", gameId, "players", user.email);
       await setDoc(
-        doc(db, "games", gameId, "players", user.email),
+        playerRef,
         {
           joinedAt: serverTimestamp(),
           email: user.email,
@@ -279,31 +318,40 @@ if (gameCodeText && playerListEl) {
         { merge: true }
       );
 
-      // Live player list
-      onSnapshot(collection(db, "games", gameId, "players"), (snap) => {
+      // Live players list
+      const playersCol = collection(db, "games", gameId, "players");
+      onSnapshot(playersCol, (snap) => {
         playerListEl.innerHTML = "";
         snap.forEach((d) => {
+          const data = d.data();
           const li = document.createElement("li");
-          li.textContent = d.data().username || d.data().email || d.id;
+          li.textContent = data.username || data.email || d.id;
           playerListEl.appendChild(li);
         });
       });
 
-      // Start game (host only)
+      // Host-only "Start game" button
       if (startGameBtn) {
         const isHost = game.hostId === user.email;
 
         if (!isHost) {
           startGameBtn.disabled = true;
-          if (hostOnlyNote)
+          if (hostOnlyNote) {
             hostOnlyNote.textContent = "Only the host can start the game.";
+          }
         } else {
-          if (hostOnlyNote) hostOnlyNote.textContent = "You are the host.";
+          if (hostOnlyNote) {
+            hostOnlyNote.textContent = "You are the host.";
+          }
         }
 
         startGameBtn.addEventListener("click", async () => {
           try {
             const latestSnap = await getDoc(gameRef);
+            if (!latestSnap.exists()) {
+              return toast("Game not found.");
+            }
+
             const latest = latestSnap.data();
             if (latest.status !== "waiting") {
               return toast("Game has already started.");
@@ -315,9 +363,10 @@ if (gameCodeText && playerListEl) {
             const playerIds = playersSnap.docs.map((d) => d.id);
 
             if (playerIds.length < 3) {
-              return toast("At least 3 players are required.");
+              return toast("At least 3 players are required to start.");
             }
 
+            // Shuffle players to assign
             const shuffled = [...playerIds].sort(
               () => Math.random() - 0.5
             );
@@ -327,15 +376,17 @@ if (gameCodeText && playerListEl) {
               const giverId = shuffled[i];
               const receiverId = shuffled[(i + 1) % shuffled.length];
 
-              batch.set(
-                doc(db, "assignments", `${gameId}_${giverId}`),
-                {
-                  gameId,
-                  giverId,
-                  receiverId,
-                  createdAt: serverTimestamp()
-                }
+              const assignRef = doc(
+                db,
+                "assignments",
+                `${gameId}_${giverId}`
               );
+              batch.set(assignRef, {
+                gameId,
+                giverId,
+                receiverId,
+                createdAt: serverTimestamp()
+              });
             }
 
             batch.update(gameRef, {
@@ -382,10 +433,10 @@ if (revealText) {
 
       const { receiverId } = assignSnap.data();
 
-      const receiverSnap = await getDoc(doc(db, "users", receiverId));
+      const reciverSnap = await getDoc(doc(db, "users", receiverId));
       const receiverName =
-        receiverSnap.exists() && receiverSnap.data().username
-          ? receiverSnap.data().username
+        reciverSnap.exists() && reciverSnap.data().username
+          ? reciverSnap.data().username
           : "Your assigned person";
 
       revealText.textContent = `You are buying for: ${receiverName}`;
@@ -397,7 +448,7 @@ if (revealText) {
 }
 
 // ===============================
-// Lobby "reveal" button behavior
+// Lobby → Reveal button auto-enable
 // ===============================
 (async () => {
   if (!window.location.pathname.includes("lobby")) return;
@@ -419,13 +470,10 @@ if (revealText) {
   const gameRef = doc(db, "games", gameId);
 
   const first = await getDoc(gameRef);
-  if (first.exists()) {
-    const g = first.data();
-    if (g.status === "started") {
-      revealBtn.disabled = false;
-      revealStatus.textContent =
-        "Game started! Click to view your assignment.";
-    }
+  if (first.exists() && first.data().status === "started") {
+    revealBtn.disabled = false;
+    revealStatus.textContent =
+      "Game started! Click to view your assignment.";
   }
 
   onSnapshot(gameRef, (snap) => {
@@ -448,3 +496,11 @@ if (revealText) {
   });
 })();
 
+// ===============================
+// Copy game code button (if present)
+// ===============================
+const copyBtn = document.getElementById("copyCodeBtn");
+if (copyBtn && gameCodeText) {
+  copyBtn.onclick = () =>
+    copyToClipboard(gameCodeText.textContent || "");
+}
