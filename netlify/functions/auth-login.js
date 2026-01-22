@@ -1,12 +1,13 @@
+// netlify/functions/auth-login.js
 import crypto from "node:crypto";
 
 export async function handler() {
-  // generate PKCE code verifier
-  const verifier = crypto.randomUUID().replace(/-/g, "");
+  // Generate PKCE verifier
+  const verifier = crypto.randomBytes(32).toString("base64url");
 
-  // generate PKCE code challenge
-  const hash = crypto.createHash("sha256").update(verifier).digest();
-  const challenge = hash.toString("base64")
+  // Compute PKCE challenge
+  const hash = crypto.createHash("sha256").update(verifier).digest("base64");
+  const challenge = hash
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/, "");
@@ -23,7 +24,10 @@ export async function handler() {
   return {
     statusCode: 302,
     headers: {
-      "Set-Cookie": `pkce=${verifier}; HttpOnly; Secure; Path=/`,
+      // short-lived pkce cookie
+      "Set-Cookie": [
+        `pkce=${verifier}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`
+      ].join(", "),
       Location: `https://auth.hackclub.com/oauth/authorize?${params.toString()}`
     }
   };
