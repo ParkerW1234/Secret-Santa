@@ -1,32 +1,26 @@
-import { Issuer, generators } from "openid-client";
-import cookie from "cookie";
-
 export async function handler() {
-  const hackclub = await Issuer.discover("https://auth.hackclub.com");
+  const verifier = crypto.randomUUID().replace(/-/g, '');
+  const data = new TextEncoder().encode(verifier);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  const challenge = btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 
-  const client = new hackclub.Client({
+  const params = new URLSearchParams({
     client_id: process.env.HACKCLUB_CLIENT_ID,
-    client_secret: process.env.HACKCLUB_CLIENT_SECRET,
-    redirect_uris: [process.env.HACKCLUB_REDIRECT_URI],
-    response_types: ["code"]
+    redirect_uri: process.env.HACKCLUB_REDIRECT_URI,
+    response_type: "code",
+    scope: process.env.HACKCLUB_SCOPES,
+    code_challenge: challenge,
+    code_challenge_method: "S256"
   });
-
-  const codeVerifier = generators.codeVerifier();
-  const codeChallenge = generators.codeChallenge(codeVerifier);
 
   return {
     statusCode: 302,
     headers: {
-      "Set-Cookie": cookie.serialize("pkce", codeVerifier, {
-        httpOnly: true,
-        secure: true,
-        path: "/"
-      }),
-      Location: client.authorizationUrl({
-        scope: process.env.HACKCLUB_SCOPES,
-        code_challenge: codeChallenge,
-        code_challenge_method: "S256"
-      })
+      "Set-Cookie": `pkce=${verifier}; HttpOnly; Secure; Path=/`,
+      Location: `https://auth.hackclub.com/oauth/authorize?${params.toString()}`
     }
   };
 }
