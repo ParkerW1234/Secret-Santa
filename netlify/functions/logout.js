@@ -1,4 +1,5 @@
 // netlify/functions/logout.js
+
 export async function handler() {
   return {
     statusCode: 302,
