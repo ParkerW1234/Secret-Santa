@@ -1,11 +1,15 @@
+import crypto from "node:crypto";
+
 export async function handler() {
-  const verifier = crypto.randomUUID().replace(/-/g, '');
-  const data = new TextEncoder().encode(verifier);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  const challenge = btoa(String.fromCharCode(...new Uint8Array(digest)))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
+  // generate PKCE code verifier
+  const verifier = crypto.randomUUID().replace(/-/g, "");
+
+  // generate PKCE code challenge
+  const hash = crypto.createHash("sha256").update(verifier).digest();
+  const challenge = hash.toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 
   const params = new URLSearchParams({
     client_id: process.env.HACKCLUB_CLIENT_ID,
