@@ -1,6 +1,7 @@
 import { Issuer, generators } from "openid-client";
+import cookie from "cookie";
 
-export async function handler(event, context) {
+export async function handler(event) {
   const hackclub = await Issuer.discover("https://auth.hackclub.com");
 
   const client = new hackclub.Client({
@@ -13,11 +14,14 @@ export async function handler(event, context) {
   const codeVerifier = generators.codeVerifier();
   const codeChallenge = generators.codeChallenge(codeVerifier);
 
-  // Store verifier using Netlify cookies
   return {
     statusCode: 302,
     headers: {
-      "Set-Cookie": `verifier=${codeVerifier}; HttpOnly; Path=/; Secure`,
+      "Set-Cookie": cookie.serialize("pkce_verifier", codeVerifier, {
+        httpOnly: true,
+        path: "/",
+        secure: true
+      }),
       Location: client.authorizationUrl({
         scope: process.env.HACKCLUB_SCOPES,
         code_challenge: codeChallenge,
