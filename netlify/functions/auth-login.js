@@ -1,7 +1,7 @@
 import { Issuer, generators } from "openid-client";
 import cookie from "cookie";
 
-export async function handler(event) {
+export async function handler() {
   const hackclub = await Issuer.discover("https://auth.hackclub.com");
 
   const client = new hackclub.Client({
@@ -17,10 +17,10 @@ export async function handler(event) {
   return {
     statusCode: 302,
     headers: {
-      "Set-Cookie": cookie.serialize("pkce_verifier", codeVerifier, {
+      "Set-Cookie": cookie.serialize("pkce", codeVerifier, {
         httpOnly: true,
-        path: "/",
-        secure: true
+        secure: true,
+        path: "/"
       }),
       Location: client.authorizationUrl({
         scope: process.env.HACKCLUB_SCOPES,
