@@ -1,13 +1,11 @@
 // netlify/functions/auth-login.js
 
-export async function handler() {
+exports.handler = async () => {
   const params = new URLSearchParams({
     client_id: process.env.HACKCLUB_CLIENT_ID,
     redirect_uri: process.env.HACKCLUB_REDIRECT_URI,
     response_type: "code",
-    scope:
-      process.env.HACKCLUB_SCOPES ||
-      "openid profile email verification_status"
+    scope: "openid profile email verification_status"
   });
 
   return {
@@ -16,4 +14,4 @@ export async function handler() {
       Location: `https://auth.hackclub.com/oauth/authorize?${params.toString()}`
     }
   };
-}
+};

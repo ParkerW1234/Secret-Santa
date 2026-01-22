@@ -1,6 +1,15 @@
 // netlify/functions/auth-callback.js
 
-export async function handler(event) {
+const admin = require("firebase-admin");
+
+if (!admin.apps.length) {
+  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+}
+
+exports.handler = async (event) => {
   try {
     const url = new URL(event.rawUrl);
     const code = url.searchParams.get("code");
@@ -13,6 +22,7 @@ export async function handler(event) {
       };
     }
 
+    // Exchange code for tokens at Hack Club Auth
     const body = new URLSearchParams({
       client_id: process.env.HACKCLUB_CLIENT_ID,
       client_secret: process.env.HACKCLUB_CLIENT_SECRET,
@@ -47,11 +57,47 @@ export async function handler(event) {
       };
     }
 
-    // Set HttpOnly session cookie for 7 days
+    // Decode Hack Club id_token payload
+    const parts = idToken.split(".");
+    if (parts.length !== 3) {
+      console.error("Invalid id_token format");
+      return {
+        statusCode: 302,
+        headers: { Location: "/login.html" }
+      };
+    }
+
+    const payloadB64 = parts[1];
+    const padded = payloadB64.padEnd(payloadB64.length + (4 - (payloadB64.length % 4)) % 4, "=");
+    const payloadJson = Buffer.from(padded.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString(
+      "utf8"
+    );
+    const payload = JSON.parse(payloadJson);
+
+    const sub = payload.sub;           // Hack Club ID (your uid)
+    const email = payload.email || null;
+    const name = payload.name || email || sub;
+
+    // Mint Firebase custom token with uid = sub
+    const firebaseToken = await admin.auth().createCustomToken(sub, {
+      email,
+      name
+    });
+
+    // Store Firebase custom token in HttpOnly cookie
+    const cookie = [
+      `session=${firebaseToken}`,
+      "HttpOnly",
+      "Secure",
+      "SameSite=None",
+      "Path=/",
+      "Max-Age=604800" // 7 days
+    ].join("; ");
+
     return {
       statusCode: 302,
       headers: {
-        "Set-Cookie": `session=${idToken}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=604800`,
+        "Set-Cookie": cookie,
         Location: "/dashboard.html"
       }
     };
@@ -62,4 +108,4 @@ export async function handler(event) {
       headers: { Location: "/login.html" }
     };
   }
-}
+};

@@ -1,6 +1,5 @@
-// ===============================
-// Firebase Initialization
-// ===============================
+// public/app.js
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import {
   getAuth,
@@ -25,6 +24,9 @@ import {
 
 console.log("app.js loaded on:", window.location.href);
 
+// ===============================
+// Firebase Init
+// ===============================
 const firebaseConfig = {
   apiKey: "AIzaSyCzxOfchCIdY-j6UNwHGYdou1oRNOW0MOU",
   authDomain: "secret-santa-64c16.firebaseapp.com",
@@ -40,7 +42,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // ===============================
-// UI Helpers
+// Helpers
 // ===============================
 function toast(msg) {
   const t = document.getElementById("toast");
@@ -83,42 +85,24 @@ function makeGameCode(len = 5) {
 // ===============================
 // Backend Session → Firebase Auth
 // ===============================
-
-/**
- * Calls Netlify /.netlify/functions/whoami
- * Expected response:
- * {
- *   user: { sub, email, name, ... } | null,
- *   firebaseToken: "..." | null
- * }
- */
-async function fetchSession() {
+async function fetchSessionToken() {
   try {
     const res = await fetch("/.netlify/functions/whoami", {
       credentials: "include"
     });
     const data = await res.json();
-    return data || { user: null, firebaseToken: null };
+    return data.firebaseToken || null;
   } catch (err) {
-    console.error("fetchSession failed:", err);
-    return { user: null, firebaseToken: null };
+    console.error("fetchSessionToken failed:", err);
+    return null;
   }
 }
 
-/**
- * Ensures Firebase Auth user is signed in using the backend-provided
- * custom token (firebaseToken). Returns the Firebase user or null.
- */
 async function ensureFirebaseUserFromSession() {
-  // Already signed in
   if (auth.currentUser) return auth.currentUser;
 
-  const session = await fetchSession();
-  const { user, firebaseToken } = session;
-
-  if (!user || !firebaseToken) {
-    return null;
-  }
+  const firebaseToken = await fetchSessionToken();
+  if (!firebaseToken) return null;
 
   try {
     await signInWithCustomToken(auth, firebaseToken);
@@ -127,7 +111,6 @@ async function ensureFirebaseUserFromSession() {
     return null;
   }
 
-  // Wait for onAuthStateChanged to fire
   return new Promise((resolve) => {
     const unsub = onAuthStateChanged(auth, (u) => {
       unsub();
@@ -136,49 +119,39 @@ async function ensureFirebaseUserFromSession() {
   });
 }
 
-/**
- * Guard used for protected pages. If user isn't logged in both
- * in backend session (Hack Club) and Firebase, redirect to login.
- */
 async function requireUser() {
-  const firebaseUser = await ensureFirebaseUserFromSession();
-  if (!firebaseUser) {
+  const user = await ensureFirebaseUserFromSession();
+  if (!user) {
     window.location.href = "login.html";
     return null;
   }
-  return firebaseUser;
+  return user;
 }
 
 // ===============================
-// Route Guard (per-page behavior)
+// Route Guard
 // ===============================
 (async () => {
   const path = window.location.pathname;
-
   const isProtected =
     path.includes("dashboard") ||
     path.includes("lobby") ||
     path.includes("reveal");
-
   const isLogin = path.includes("login");
 
-  // If we're on a protected page, require user.
   if (isProtected) {
     const u = await requireUser();
-    if (!u) return; // redirected
-    console.log("[guard] protected page, logged in as:", u.email);
+    if (!u) return;
+    console.log("[guard] protected path:", path, "uid:", u.uid, "email:", u.email);
   } else if (isLogin) {
-    // On login page: if we already have a Firebase user from session, go to dashboard.
-    const firebaseUser = await ensureFirebaseUserFromSession();
-    if (firebaseUser) {
+    const u = await ensureFirebaseUserFromSession();
+    if (u) {
       console.log("[guard] already signed in, redirecting to dashboard");
       window.location.href = "dashboard.html";
       return;
-    } else {
-      console.log("[guard] on login page, no user (yet)");
     }
   } else {
-    console.log("[guard] public page:", path);
+    console.log("[guard] public path:", path);
   }
 })();
 
@@ -188,7 +161,6 @@ async function requireUser() {
 const loginBtn = document.getElementById("loginBtn");
 if (loginBtn) {
   loginBtn.addEventListener("click", () => {
-    // Hand off to Netlify + Hack Club Auth
     window.location.href = "/.netlify/functions/auth-login";
   });
 }
@@ -199,14 +171,14 @@ if (logoutBtn) {
     try {
       await signOut(auth);
     } catch (e) {
-      console.warn("Firebase signOut failed (maybe not signed in):", e);
+      console.warn("Firebase signOut error:", e);
     }
     window.location.href = "/.netlify/functions/logout";
   });
 }
 
 // ===============================
-// Dashboard: Profile (username)
+// Dashboard: Profile
 // ===============================
 const usernameInput = document.getElementById("usernameInput");
 const saveUsernameBtn = document.getElementById("saveUsernameBtn");
@@ -217,7 +189,7 @@ if (usernameInput && saveUsernameBtn && currentUsernameEl) {
     const user = await requireUser();
     if (!user) return;
 
-    const userRef = doc(db, "users", user.uid); // uid = Hack Club sub via custom token
+    const userRef = doc(db, "users", user.uid);
     const snap = await getDoc(userRef);
 
     if (snap.exists() && snap.data().username) {
@@ -232,7 +204,11 @@ if (usernameInput && saveUsernameBtn && currentUsernameEl) {
       const username = usernameInput.value.trim();
       if (!username) return toast("Enter a username.");
 
-      await setDoc(userRef, { username, email: user.email || null }, { merge: true });
+      await setDoc(
+        userRef,
+        { username, email: user.email || null },
+        { merge: true }
+      );
       currentUsernameEl.textContent = `Current username: ${username}`;
       toast("Username saved!");
     });
@@ -300,7 +276,7 @@ if (joinGameBtn) {
 }
 
 // ===============================
-// Lobby: Players list + host controls
+// Lobby: Players + Host Controls
 // ===============================
 const gameCodeText = document.getElementById("gameCodeText");
 const playerListEl = document.getElementById("playerList");
@@ -334,7 +310,7 @@ if (gameCodeText && playerListEl) {
         copyBtn.onclick = () => copyToClipboard(game.code);
       }
 
-      // Attach current user as player
+      // Add current user to players
       const userProfileRef = doc(db, "users", user.uid);
       const userProfileSnap = await getDoc(userProfileRef);
       const username = userProfileSnap.exists()
@@ -385,6 +361,7 @@ if (gameCodeText && playerListEl) {
               toast("Game not found.");
               return;
             }
+
             const latest = latestSnap.data();
             if (latest.status !== "waiting") {
               toast("Game has already started.");
@@ -401,7 +378,6 @@ if (gameCodeText && playerListEl) {
               return;
             }
 
-            // Create circular assignments
             const shuffled = [...playerIds].sort(() => Math.random() - 0.5);
             const batch = writeBatch(db);
 
@@ -443,7 +419,7 @@ if (gameCodeText && playerListEl) {
 }
 
 // ===============================
-// Lobby: Reveal button enable when started
+// Lobby: Reveal Button State
 // ===============================
 (async () => {
   if (!window.location.pathname.includes("lobby")) return;
