@@ -5,7 +5,6 @@ const admin = require("firebase-admin");
 if (!admin.apps.length) {
   const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
-  // 🔥 FIX #1: Reconstitute PEM formatting for Firebase Admin
   serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
 
   console.log("PRIVATE_KEY_RAW:", JSON.stringify(serviceAccount.private_key));
@@ -26,7 +25,7 @@ exports.handler = async (event) => {
       return redirect("/login.html");
     }
 
-    // Exchange code for tokens at Hack Club Auth
+   
     const body = new URLSearchParams({
       client_id: process.env.HACKCLUB_CLIENT_ID,
       client_secret: process.env.HACKCLUB_CLIENT_SECRET,
@@ -54,25 +53,25 @@ exports.handler = async (event) => {
       return redirect("/login.html");
     }
 
-    // Decode JWT payload manually (no validation required yet)
+   
     const payload = decodeJWT(idToken);
     if (!payload) return redirect("/login.html");
 
-    const sub = payload.sub;   // Hack Club's stable user ID
+    const sub = payload.sub;   
     const email = payload.email || null;
     const name = payload.name || email || sub;
 
-    // 🔥 FIX #2: Mint Firebase token with UID = sub
+    
     const firebaseToken = await admin.auth().createCustomToken(sub, { email, name });
 
-    // 🔥 FIX #3: Set HttpOnly cookie for session
+    
     const cookie = [
       `session=${firebaseToken}`,
       `HttpOnly`,
       `Secure`,
       `SameSite=None`,
       `Path=/`,
-      `Max-Age=604800` // 7 days
+      `Max-Age=604800` 
     ].join("; ");
 
     return {
@@ -89,7 +88,7 @@ exports.handler = async (event) => {
   }
 };
 
-// --- helper utilities ---
+
 
 function redirect(loc) {
   return {
@@ -98,7 +97,7 @@ function redirect(loc) {
   };
 }
 
-// 🔍 Manual JWT decode
+
 function decodeJWT(token) {
   try {
     const parts = token.split(".");
