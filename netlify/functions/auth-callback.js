@@ -8,6 +8,9 @@ if (!admin.apps.length) {
   // 🔥 FIX #1: Reconstitute PEM formatting for Firebase Admin
   serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
 
+  console.log("PRIVATE_KEY_RAW:", JSON.stringify(serviceAccount.private_key));
+
+
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount)
   });
