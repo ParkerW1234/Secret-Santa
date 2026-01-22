@@ -6,13 +6,13 @@
     <link rel="stylesheet" href="./style.css">
 </head> 
 <body>
-   <div class="container">
+<div class="container">
   <div class="header">
     <div class="brand">
       <div class="logo"></div>
       <div>
         <h1>Secret Santa</h1>
-        <div class="small">Passwordless login (email link)</div>
+        <div class="small">Sign in with Hack Club</div>
       </div>
     </div>
   </div>
@@ -20,18 +20,25 @@
   <div class="card" style="max-width:520px;">
     <h2>Log in</h2>
 
-    <label for="email">Email</label>
-    <input id="email" type="email" placeholder="you@example.com" />
-
     <div class="row" style="margin-top:12px;">
-      <button id="loginBtn" class="primary">Send login link</button>
-      <span class="small">Check spam if you don’t see it.</span>
+      <button id="loginBtn" class="primary" onclick="loginWithHackClub()">
+        Sign in with Hack Club
+      </button>
+    </div>
+
+    <div class="small" style="margin-top:8px; opacity:.75;">
+      You’ll be redirected to Hack Club Auth
     </div>
   </div>
 </div>
 
 <div id="toast" class="toast"></div>
-<script type="module" src="app.js"></script>
 
+<script>
+  // Redirect to Netlify serverless function that begins OAuth flow
+  function loginWithHackClub() {
+    window.location.href = "/.netlify/functions/auth-login";
+  }
+</script>
 </body>
 </html>
