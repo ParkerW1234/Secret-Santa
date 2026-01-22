@@ -11,7 +11,7 @@ Create a game, share a code, start the exchange, and privately reveal assignment
 <h2>✨ Features</h2>
 
 <ul>
-  <li>🔐 Passwordless login (email link)</li>
+  <li>🔐 Passwordless login (Hackclub Login)</li>
   <li>👤 Usernames (emails never shown to others)</li>
   <li>🎟️ Create &amp; join games with a short code</li>
   <li>👥 Real-time lobby updates</li>
@@ -27,7 +27,7 @@ Create a game, share a code, start the exchange, and privately reveal assignment
 <h2>🧠 How It Works</h2>
 
 <ol>
-  <li>Visit the site and log in using an email link</li>
+  <li>Visit the site and log in using Hack Club</li>
   <li>Choose a username</li>
   <li>Create a game or join one using a 5-character code</li>
   <li>Players gather in the lobby</li>
@@ -45,25 +45,9 @@ Assignments are generated randomly and securely. No player can see anyone else�
 
 <ul>
   <li><strong>Frontend:</strong> Vanilla HTML, CSS, JavaScript</li>
-  <li><strong>Authentication:</strong> Firebase Authentication (passwordless email link)</li>
+  <li><strong>Authentication:</strong> Hackclub Authentication</li>
   <li><strong>Database:</strong> Firestore</li>
-  <li><strong>Hosting:</strong> Firebase Hosting (recommended)</li>
 </ul>
-
-<hr />
-
-<h2>📁 Project Structure</h2>
-
-<pre>
-public/
-├── index.html        # Landing page
-├── login.html        # Passwordless login
-├── dashboard.html    # Profile + create/join
-├── lobby.html        # Game lobby
-├── reveal.html       # Assignment reveal
-├── style.css         # Global styles
-└── app.js            # Application logic
-</pre>
 
 <hr />
 
@@ -86,10 +70,10 @@ These rules prevent cheating, snooping, and unauthorized access.
 
 <hr />
 
-<h2>✉️ Passwordless Email</h2>
+<h2>✉️ Passwordless</h2>
 
 <p>
-Login emails are sent using Firebase’s built-in passwordless authentication system.
+Login uses Hack Club's authentication system.
 </p>
 
 <hr />
