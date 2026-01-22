@@ -187,7 +187,7 @@ if (usernameInput && saveUsernameBtn && currentUsernameEl) {
     if (!user) return;
 
     // We key users by email (your choice A)
-    const userRef = doc(db, "users", user.email);
+    const userRef = doc(db, "users", user.sub);
     const snap = await getDoc(userRef);
 
     if (snap.exists() && snap.data().username) {
@@ -231,7 +231,7 @@ if (createGameBtn) {
       const code = makeGameCode(5);
       const gameRef = await addDoc(collection(db, "games"), {
         code,
-        hostId: user.email,    // host id by email
+        hostId: user.sub,    // host id by email
         status: "waiting",
         createdAt: serverTimestamp()
       });
@@ -302,17 +302,17 @@ if (gameCodeText && playerListEl) {
       gameCodeText.textContent = game.code;
 
       // Add current user to this game's players subcollection
-      const userProfileSnap = await getDoc(doc(db, "users", user.email));
+      const userProfileSnap = await getDoc(doc(db, "users", user.sub));
       const username = userProfileSnap.exists()
         ? userProfileSnap.data().username || ""
         : "";
 
-      const playerRef = doc(db, "games", gameId, "players", user.email);
+      const playerRef = doc(db, "games", gameId, "players", user.sub);
       await setDoc(
         playerRef,
         {
           joinedAt: serverTimestamp(),
-          email: user.email,
+          email: user.sub,
           username
         },
         { merge: true }
@@ -332,7 +332,7 @@ if (gameCodeText && playerListEl) {
 
       // Host-only "Start game" button
       if (startGameBtn) {
-        const isHost = game.hostId === user.email;
+        const isHost = game.hostId === user.sub;
 
         if (!isHost) {
           startGameBtn.disabled = true;
@@ -422,7 +422,7 @@ if (revealText) {
       const user = await requireUser();
       if (!user) return;
 
-      const assignRef = doc(db, "assignments", `${gameId}_${user.email}`);
+      const assignRef = doc(db, "assignments", `${gameId}_${user.sub}`);
       const assignSnap = await getDoc(assignRef);
 
       if (!assignSnap.exists()) {
