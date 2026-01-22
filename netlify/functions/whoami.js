@@ -5,7 +5,6 @@ function decodeJwt(token) {
   if (parts.length !== 3) throw new Error("Invalid JWT");
   const payload = parts[1];
 
-  // base64url → base64
   const b64 = payload.replace(/-/g, "+").replace(/_/g, "/");
   const pad = b64.length % 4;
   const padded = b64 + (pad ? "=".repeat(4 - pad) : "");
