@@ -1,5 +1,6 @@
-// public/app.js
-
+// ===================================================
+// Firebase Imports
+// ===================================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import {
   getAuth,
@@ -24,9 +25,9 @@ import {
 
 console.log("app.js loaded on:", window.location.href);
 
-// ===============================
-// Firebase Init
-// ===============================
+// ===================================================
+// Firebase Initialization
+// ===================================================
 const firebaseConfig = {
   apiKey: "AIzaSyCzxOfchCIdY-j6UNwHGYdou1oRNOW0MOU",
   authDomain: "secret-santa-64c16.firebaseapp.com",
@@ -41,9 +42,9 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// ===============================
-// Helpers
-// ===============================
+// ===================================================
+// UI Helpers
+// ===================================================
 function toast(msg) {
   const t = document.getElementById("toast");
   if (!t) return;
@@ -82,10 +83,10 @@ function makeGameCode(len = 5) {
   return out;
 }
 
-// ===============================
-// Backend Session → Firebase Auth
-// ===============================
-async function fetchSessionToken() {
+// ===================================================
+// Backend Session → Firebase Bootstrap
+// ===================================================
+async function getSessionToken() {
   try {
     const res = await fetch("/.netlify/functions/whoami", {
       credentials: "include"
@@ -93,34 +94,38 @@ async function fetchSessionToken() {
     const data = await res.json();
     return data.firebaseToken || null;
   } catch (err) {
-    console.error("fetchSessionToken failed:", err);
+    console.error("[whoami] failed:", err);
     return null;
   }
 }
 
-async function ensureFirebaseUserFromSession() {
-  if (auth.currentUser) return auth.currentUser;
-
-  const firebaseToken = await fetchSessionToken();
-  if (!firebaseToken) return null;
-
-  try {
-    await signInWithCustomToken(auth, firebaseToken);
-  } catch (err) {
-    console.error("signInWithCustomToken failed:", err);
-    return null;
-  }
-
-  return new Promise((resolve) => {
-    const unsub = onAuthStateChanged(auth, (u) => {
+async function getFirebaseUser() {
+  return new Promise(resolve => {
+    const unsub = onAuthStateChanged(auth, u => {
       unsub();
       resolve(u);
     });
   });
 }
 
+async function ensureFirebaseUser() {
+  if (auth.currentUser) return auth.currentUser;
+
+  const token = await getSessionToken();
+  if (!token) return null;
+
+  try {
+    await signInWithCustomToken(auth, token);
+  } catch (err) {
+    console.error("signInWithCustomToken failed:", err);
+    return null;
+  }
+
+  return await getFirebaseUser();
+}
+
 async function requireUser() {
-  const user = await ensureFirebaseUserFromSession();
+  const user = await ensureFirebaseUser();
   if (!user) {
     window.location.href = "login.html";
     return null;
@@ -128,58 +133,63 @@ async function requireUser() {
   return user;
 }
 
-// ===============================
-// Route Guard
-// ===============================
+// ===================================================
+// Route Guard (Loop-Free)
+// ===================================================
 (async () => {
   const path = window.location.pathname;
-  const isProtected =
-    path.includes("dashboard") ||
-    path.includes("lobby") ||
-    path.includes("reveal");
+  const protectedPages = ["dashboard", "lobby", "reveal"];
+  const isProtected = protectedPages.some(p => path.includes(p));
   const isLogin = path.includes("login");
 
-  if (isProtected) {
-    const u = await requireUser();
-    if (!u) return;
-    console.log("[guard] protected path:", path, "uid:", u.uid, "email:", u.email);
-  } else if (isLogin) {
-    const u = await ensureFirebaseUserFromSession();
-    if (u) {
-      console.log("[guard] already signed in, redirecting to dashboard");
-      window.location.href = "dashboard.html";
-      return;
-    }
-  } else {
-    console.log("[guard] public path:", path);
+  const token = await getSessionToken();
+  const firebaseUser = await ensureFirebaseUser();
+
+  if (isProtected && !token) {
+    console.log("[guard] no session cookie → login");
+    window.location.href = "login.html";
+    return;
   }
+
+  if (isProtected && token && !firebaseUser) {
+    console.log("[guard] waiting for firebase user, staying put");
+    return;
+  }
+
+  if (isLogin && firebaseUser) {
+    console.log("[guard] already logged in → dashboard");
+    window.location.href = "dashboard.html";
+    return;
+  }
+
+  console.log("[guard] OK", { path, token, firebaseUser });
 })();
 
-// ===============================
+// ===================================================
 // Login / Logout Buttons
-// ===============================
+// ===================================================
 const loginBtn = document.getElementById("loginBtn");
 if (loginBtn) {
-  loginBtn.addEventListener("click", () => {
+  loginBtn.onclick = () => {
     window.location.href = "/.netlify/functions/auth-login";
-  });
+  };
 }
 
 const logoutBtn = document.getElementById("logoutBtn");
 if (logoutBtn) {
-  logoutBtn.addEventListener("click", async () => {
+  logoutBtn.onclick = async () => {
     try {
       await signOut(auth);
     } catch (e) {
       console.warn("Firebase signOut error:", e);
     }
     window.location.href = "/.netlify/functions/logout";
-  });
+  };
 }
 
-// ===============================
-// Dashboard: Profile
-// ===============================
+// ===================================================
+// Dashboard: Username Profile
+// ===================================================
 const usernameInput = document.getElementById("usernameInput");
 const saveUsernameBtn = document.getElementById("saveUsernameBtn");
 const currentUsernameEl = document.getElementById("currentUsername");
@@ -200,27 +210,22 @@ if (usernameInput && saveUsernameBtn && currentUsernameEl) {
       currentUsernameEl.textContent = "No username set yet.";
     }
 
-    saveUsernameBtn.addEventListener("click", async () => {
+    saveUsernameBtn.onclick = async () => {
       const username = usernameInput.value.trim();
       if (!username) return toast("Enter a username.");
-
-      await setDoc(
-        userRef,
-        { username, email: user.email || null },
-        { merge: true }
-      );
+      await setDoc(userRef, { username, email: user.email || null }, { merge: true });
       currentUsernameEl.textContent = `Current username: ${username}`;
       toast("Username saved!");
-    });
+    };
   })();
 }
 
-// ===============================
+// ===================================================
 // Dashboard: Create Game
-// ===============================
+// ===================================================
 const createGameBtn = document.getElementById("createGameBtn");
 if (createGameBtn) {
-  createGameBtn.addEventListener("click", async () => {
+  createGameBtn.onclick = async () => {
     try {
       const user = await requireUser();
       if (!user) return;
@@ -237,17 +242,17 @@ if (createGameBtn) {
       window.location.href = `lobby.html?id=${gameRef.id}`;
     } catch (err) {
       console.error("Create game failed:", err);
-      toast(`Create game failed: ${err.message || err.code || "Error"}`);
+      toast(`Create game failed: ${err.message}`);
     }
-  });
+  };
 }
 
-// ===============================
+// ===================================================
 // Dashboard: Join Game
-// ===============================
+// ===================================================
 const joinGameBtn = document.getElementById("joinGameBtn");
 if (joinGameBtn) {
-  joinGameBtn.addEventListener("click", async () => {
+  joinGameBtn.onclick = async () => {
     try {
       const user = await requireUser();
       if (!user) return;
@@ -258,26 +263,25 @@ if (joinGameBtn) {
 
       const q = query(collection(db, "games"), where("code", "==", code));
       const snap = await getDocs(q);
-      if (snap.empty) return toast("Game not found. Check the code.");
+      if (snap.empty) return toast("Game not found.");
 
       const gameDoc = snap.docs[0];
       const game = gameDoc.data();
-
       if (game.status !== "waiting") {
-        return toast("That game has already started.");
+        return toast("That game already started.");
       }
 
       window.location.href = `lobby.html?id=${gameDoc.id}`;
     } catch (err) {
       console.error("Join game failed:", err);
-      toast(`Join game failed: ${err.message || err.code || "Error"}`);
+      toast(`Join game failed: ${err.message}`);
     }
-  });
+  };
 }
 
-// ===============================
+// ===================================================
 // Lobby: Players + Host Controls
-// ===============================
+// ===================================================
 const gameCodeText = document.getElementById("gameCodeText");
 const playerListEl = document.getElementById("playerList");
 const startGameBtn = document.getElementById("startGameBtn");
@@ -288,10 +292,7 @@ if (gameCodeText && playerListEl) {
   (async () => {
     try {
       const gameId = getGameIdFromUrl();
-      if (!gameId) {
-        toast("Missing game id in URL.");
-        return;
-      }
+      if (!gameId) return toast("Missing game id.");
 
       const user = await requireUser();
       if (!user) return;
@@ -310,28 +311,21 @@ if (gameCodeText && playerListEl) {
         copyBtn.onclick = () => copyToClipboard(game.code);
       }
 
-      // Add current user to players
-      const userProfileRef = doc(db, "users", user.uid);
-      const userProfileSnap = await getDoc(userProfileRef);
-      const username = userProfileSnap.exists()
-        ? userProfileSnap.data().username || ""
-        : "";
+      const profileRef = doc(db, "users", user.uid);
+      const profileSnap = await getDoc(profileRef);
+      const username = profileSnap.exists() ? profileSnap.data().username || "" : "";
 
       const playerRef = doc(db, "games", gameId, "players", user.uid);
-      await setDoc(
-        playerRef,
-        {
-          joinedAt: serverTimestamp(),
-          email: user.email || null,
-          username
-        },
-        { merge: true }
-      );
+      await setDoc(playerRef, {
+        joinedAt: serverTimestamp(),
+        email: user.email || null,
+        username
+      }, { merge: true });
 
       const playersCol = collection(db, "games", gameId, "players");
-      onSnapshot(playersCol, (snap) => {
+      onSnapshot(playersCol, snap => {
         playerListEl.innerHTML = "";
-        snap.forEach((d) => {
+        snap.forEach(d => {
           const data = d.data();
           const li = document.createElement("li");
           li.textContent = data.username || data.email || d.id;
@@ -339,42 +333,29 @@ if (gameCodeText && playerListEl) {
         });
       });
 
-      // Host-only start control
       if (startGameBtn) {
         const isHost = game.hostId === user.uid;
-
         if (!isHost) {
           startGameBtn.disabled = true;
-          if (hostOnlyNote) {
-            hostOnlyNote.textContent = "Only the host can start the game.";
-          }
+          if (hostOnlyNote) hostOnlyNote.textContent = "Only the host can start.";
         } else {
-          if (hostOnlyNote) {
-            hostOnlyNote.textContent = "You are the host.";
-          }
+          if (hostOnlyNote) hostOnlyNote.textContent = "You are the host.";
         }
 
-        startGameBtn.addEventListener("click", async () => {
+        startGameBtn.onclick = async () => {
           try {
-            const latestSnap = await getDoc(gameRef);
-            if (!latestSnap.exists()) {
-              toast("Game not found.");
+            const latest = await getDoc(gameRef);
+            if (!latest.exists()) return;
+
+            if (latest.data().status !== "waiting") {
+              toast("Game already started.");
               return;
             }
 
-            const latest = latestSnap.data();
-            if (latest.status !== "waiting") {
-              toast("Game has already started.");
-              return;
-            }
-
-            const playersSnap = await getDocs(
-              collection(db, "games", gameId, "players")
-            );
-            const playerIds = playersSnap.docs.map((d) => d.id);
-
+            const playersSnap = await getDocs(collection(db, "games", gameId, "players"));
+            const playerIds = playersSnap.docs.map(d => d.id);
             if (playerIds.length < 3) {
-              toast("At least 3 players are required to start.");
+              toast("Need at least 3 players.");
               return;
             }
 
@@ -384,13 +365,7 @@ if (gameCodeText && playerListEl) {
             for (let i = 0; i < shuffled.length; i++) {
               const giverId = shuffled[i];
               const receiverId = shuffled[(i + 1) % shuffled.length];
-
-              const assignRef = doc(
-                db,
-                "assignments",
-                `${gameId}_${giverId}`
-              );
-              batch.set(assignRef, {
+              batch.set(doc(db, "assignments", `${gameId}_${giverId}`), {
                 gameId,
                 giverId,
                 receiverId,
@@ -404,26 +379,25 @@ if (gameCodeText && playerListEl) {
             });
 
             await batch.commit();
-            toast("Game started! Go to the reveal page to see your assignment.");
+            toast("Game started!");
           } catch (err) {
             console.error("Start game failed:", err);
-            toast(`Start game failed: ${err.message || err.code || "Error"}`);
+            toast(`Start game failed: ${err.message}`);
           }
-        });
+        };
       }
     } catch (err) {
       console.error("Lobby error:", err);
-      toast(`Lobby error: ${err.message || err.code || "Error"}`);
+      toast(`Lobby error: ${err.message}`);
     }
   })();
 }
 
-// ===============================
-// Lobby: Reveal Button State
-// ===============================
+// ===================================================
+// Lobby: Reveal Button Enable
+// ===================================================
 (async () => {
   if (!window.location.pathname.includes("lobby")) return;
-
   const revealBtn = document.getElementById("revealBtn");
   const revealStatus = document.getElementById("revealStatus");
   if (!revealBtn || !revealStatus) return;
@@ -436,49 +410,41 @@ if (gameCodeText && playerListEl) {
   }
 
   const gameRef = doc(db, "games", gameId);
-
   const first = await getDoc(gameRef);
   if (first.exists() && first.data().status === "started") {
     revealBtn.disabled = false;
-    revealStatus.textContent =
-      "Game started! Click to view your assignment.";
+    revealStatus.textContent = "Game started! View your assignment.";
   } else {
     revealBtn.disabled = true;
-    revealStatus.textContent =
-      "Waiting for host to start the game...";
+    revealStatus.textContent = "Waiting for host to start...";
   }
 
-  onSnapshot(gameRef, (snap) => {
+  onSnapshot(gameRef, snap => {
     if (!snap.exists()) return;
     const game = snap.data();
     if (game.status === "started") {
       revealBtn.disabled = false;
-      revealStatus.textContent =
-        "Game started! Click to view your assignment.";
+      revealStatus.textContent = "Game started! View your assignment.";
     } else {
       revealBtn.disabled = true;
-      revealStatus.textContent =
-        "Waiting for host to start the game...";
+      revealStatus.textContent = "Waiting for host to start...";
     }
   });
 
-  revealBtn.addEventListener("click", () => {
+  revealBtn.onclick = () => {
     window.location.href = `reveal.html?id=${gameId}`;
-  });
+  };
 })();
 
-// ===============================
+// ===================================================
 // Reveal Page
-// ===============================
+// ===================================================
 const revealText = document.getElementById("revealText");
 if (revealText) {
   (async () => {
     try {
       const gameId = getGameIdFromUrl();
-      if (!gameId) {
-        toast("Missing gameId in URL.");
-        return;
-      }
+      if (!gameId) return toast("Missing gameId.");
 
       const user = await requireUser();
       if (!user) return;
@@ -487,14 +453,13 @@ if (revealText) {
       const assignSnap = await getDoc(assignRef);
 
       if (!assignSnap.exists()) {
-        revealText.textContent =
-          "Assignment not found. Are you sure the game has started?";
+        revealText.textContent = "Assignment not found.";
         return;
       }
 
-      const { receiverId } = assignSnap.data();
-
+      const receiverId = assignSnap.data().receiverId;
       const receiverSnap = await getDoc(doc(db, "users", receiverId));
+
       const receiverName =
         receiverSnap.exists() && receiverSnap.data().username
           ? receiverSnap.data().username
@@ -503,7 +468,7 @@ if (revealText) {
       revealText.textContent = `You are buying for: ${receiverName}`;
     } catch (err) {
       console.error("Reveal error:", err);
-      toast(`Reveal error: ${err.message || err.code || "Error"}`);
+      toast(`Reveal error: ${err.message}`);
     }
   })();
 }
